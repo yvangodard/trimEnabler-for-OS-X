@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables initialisation
-version="trimEnabler v0.1 - 2016, Yvan Godard [godardyvan@gmail.com]"
+version="trimEnabler v0.2 - 2016, Yvan Godard [godardyvan@gmail.com]"
 SystemOS=$(sw_vers -productVersion | awk -F "." '{print $0}')
 SystemOSMajor=$(sw_vers -productVersion | awk -F "." '{print $1}')
 SystemOSMinor=$(sw_vers -productVersion | awk -F "." '{print $2}')
@@ -10,7 +10,9 @@ scriptDir=$(dirname "${0}")
 scriptName=$(basename "${0}")
 scriptNameWithoutExt=$(echo "${scriptName}" | cut -f1 -d '.')
 trimNotEnabled=0
+trimEnabled=0
 hasOneOrMoreSSD=0
+numberOfTrim=0
 varDirTrimEnabler="/var/${scriptNameWithoutExt}"
 varBackupDirTrimEnabler=${varDirTrimEnabler%/}/kextBackup
 IOAHCIBlockStorage="/System/Library/Extensions/IOAHCIFamily.kext/Contents/PlugIns/IOAHCIBlockStorage.kext/Contents/MacOS/IOAHCIBlockStorage"
@@ -74,14 +76,25 @@ fi
 
 # Check du TRIM Support
 # [[ ${trimNotEnabled} -ne 0 ]] >> support Trim non activé
-for trimSupport in $(system_profiler -detailLevel mini SPSerialATADataType | grep "TRIM Support" | awk '{print $3}') ; do 
+for trimSupport in $(system_profiler -detailLevel mini SPSerialATADataType | grep "TRIM Support" | awk '{print $3}') ; do
+	let numberOfTrim=${numberOfTrim}+1
 	[[ ${trimSupport} -eq "No" ]] && let trimNotEnabled=${trimNotEnabled}+1
+	[[ ${trimSupport} -eq "Yes" ]] && let trimEnabled=${trimEnabled}+1
 done
 
-# [[ ${trimNotEnabled} -ne 0 ]] >> support Trim non activé
-if [[ ${trimNotEnabled} -ne 0 ]] ; then
+# Si trim support = Yes sur chaque occurence, alors TRIM est correctement activé
+if [[ ${trimEnabled} -eq ${numberOfTrim} ]] ; then
 	echo "Votre système possède bien un Solid State Drive (SSD) ou disque Fusion Drive,"
 	echo "mais le support de TRIM est déjà activé correctement."
+	echo "> Nous quittons donc le processus."
+	exit 0
+fi
+
+# [[ ${trimNotEnabled} -ne 0 ]] >> support Trim non activé
+if [[ ${trimNotEnabled} -eq 0 ]] ; then
+	echo "Votre système possède bien un Solid State Drive (SSD) ou disque Fusion Drive,"
+	echo "mais le support de TRIM ne semble pas pris en charge."
+	echo "Nous ne trouvons pas 'TRIM support' dans les options du disque."
 	echo "> Nous quittons donc le processus."
 	exit 0
 fi
@@ -111,8 +124,7 @@ if [[ ${SystemOSMajor} -eq 10 ]] && [[ ${SystemOSMinor} -eq 10 ]] && [[ ${System
 fi
 
 ## Si le système est OS ≥ 10.10.4
-if [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -lt 10 ) ]] \
-	|| [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -eq 10 ]] && [[ ${SystemOSPoint} -lt 4 ) ]]; then
+if [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -lt 10 ) ]] || [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -eq 10 ]] && [[ ${SystemOSPoint} -lt 4 ) ]]; then
 
 	## Définition du dernier fichier de backup
 	ls -t1 ${varBackupDirTrimEnabler%/}/${backupIncipit}.original* > /dev/null 2>&1
