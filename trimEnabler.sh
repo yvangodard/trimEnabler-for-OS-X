@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables initialisation
-version="trimEnabler v0.2 - 2016, Yvan Godard [godardyvan@gmail.com]"
+version="trimEnabler v0.3 - 2016, Yvan Godard [godardyvan@gmail.com]"
 SystemOS=$(sw_vers -productVersion | awk -F "." '{print $0}')
 SystemOSMajor=$(sw_vers -productVersion | awk -F "." '{print $1}')
 SystemOSMinor=$(sw_vers -productVersion | awk -F "." '{print $2}')
@@ -78,8 +78,8 @@ fi
 # [[ ${trimNotEnabled} -ne 0 ]] >> support Trim non activé
 for trimSupport in $(system_profiler -detailLevel mini SPSerialATADataType | grep "TRIM Support" | awk '{print $3}') ; do
 	let numberOfTrim=${numberOfTrim}+1
-	[[ ${trimSupport} -eq "No" ]] && let trimNotEnabled=${trimNotEnabled}+1
-	[[ ${trimSupport} -eq "Yes" ]] && let trimEnabled=${trimEnabled}+1
+	[[ "${trimSupport}" == "No" ]] && let trimNotEnabled=${trimNotEnabled}+1
+	[[ "${trimSupport}" == "Yes" ]] && let trimEnabled=${trimEnabled}+1
 done
 
 # Si trim support = Yes sur chaque occurence, alors TRIM est correctement activé
@@ -94,13 +94,13 @@ fi
 if [[ ${trimNotEnabled} -eq 0 ]] ; then
 	echo "Votre système possède bien un Solid State Drive (SSD) ou disque Fusion Drive,"
 	echo "mais le support de TRIM ne semble pas pris en charge."
-	echo "Nous ne trouvons pas 'TRIM support' dans les options du disque."
+	echo "Nous ne trouvons pas 'TRIM support' dans les options du (des) disque(s)."
 	echo "> Nous quittons donc le processus."
 	exit 0
 fi
 
 ## Si le système est OS ≥ 10.10.4
-if [[ ${SystemOSMinor} -ge 11 ]] || [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -ge 10 && ( ${SystemOSPoint} -ge 4 )) ]] ; then
+if [[ ${SystemOSMinor} -ge 11 ]] || [[ ${SystemOSMajor} -eq 10 && ${SystemOSMinor} -ge 10 && ${SystemOSPoint} -ge 4 ]] ; then
 	tmpInputEnableTrim=$(mktemp /tmp/${scriptNameWithoutExt}_tmpInputEnableTrim.XXXXX)
 	echo "y" > ${tmpInputEnableTrim}
 	echo "y" >> ${tmpInputEnableTrim}
@@ -124,7 +124,7 @@ if [[ ${SystemOSMajor} -eq 10 ]] && [[ ${SystemOSMinor} -eq 10 ]] && [[ ${System
 fi
 
 ## Si le système est OS ≥ 10.10.4
-if [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -lt 10 ) ]] || [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -eq 10 ]] && [[ ${SystemOSPoint} -lt 4 ) ]]; then
+if [[ ${SystemOSMajor} -eq 10 && ${SystemOSMinor} -lt 10 ]] || [[ ${SystemOSMajor} -eq 10 && ${SystemOSMinor} -eq 10 && ${SystemOSPoint} -lt 4 ]]; then
 
 	## Définition du dernier fichier de backup
 	ls -t1 ${varBackupDirTrimEnabler%/}/${backupIncipit}.original* > /dev/null 2>&1
@@ -137,8 +137,10 @@ if [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -lt 10 ) ]] || [[ ${SystemOS
 	fi
 
 	## Test si déjà réalisé
-	if [[ ! -z ${lastBackupFileName} ]] && [[ $(md5 -q ${IOAHCIBlockStorage}) != $(md5 -q ${varBackupDirTrimEnabler%/}/${lastBackupFileName}) ]] \
-		&& [[ ! -z $(cat ${historyKextPatches}) ]] && [[ $(cat ${historyKextPatches}) == $(echo ${SystemOS}) ]]; then
+	if [[ ! -z ${lastBackupFileName} ]] \
+		&& [[ $(md5 -q ${IOAHCIBlockStorage}) != $(md5 -q ${varBackupDirTrimEnabler%/}/${lastBackupFileName}) ]] \
+		&& [[ ! -z $(cat ${historyKextPatches}) ]] \
+		&& [[ $(cat ${historyKextPatches}) == $(echo ${SystemOS}) ]]; then
 		echo "Le Kext a déjà été patché pour cette version de OS X ${SystemOS}."
 		echo "Si vous souhaitez patcher à nouveau le Kext vous devez supprimer"
 		echo "manuellement le fichier '${lastBackupFileName}'"
@@ -146,8 +148,8 @@ if [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -lt 10 ) ]] || [[ ${SystemOS
 		echo "> Nous quittons le processus."
 		exit 0
 	elif [[ -z ${lastBackupFileName} ]] \
-		|| [[ ! -z ${lastBackupFileName} && ( $(md5 -q ${IOAHCIBlockStorage}) == $(md5 -q ${varBackupDirTrimEnabler%/}/${lastBackupFileName}) ) ]] \
-		|| [[ ! -z $(cat ${historyKextPatches}) && ( $(cat ${historyKextPatches}) < $(echo ${SystemOS}) ) ]] \
+		|| [[ ! -z ${lastBackupFileName} && $(md5 -q ${IOAHCIBlockStorage}) == $(md5 -q ${varBackupDirTrimEnabler%/}/${lastBackupFileName}) ]] \
+		|| [[ ! -z $(cat ${historyKextPatches}) && $(cat ${historyKextPatches}) < $(echo ${SystemOS}) ]] \
 		|| [[ -z $(cat ${historyKextPatches}) ]] ; then
 
 		## Copie de backup du fichier kext
@@ -168,9 +170,10 @@ if [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -lt 10 ) ]] || [[ ${SystemOS
 		# The APPLE SSD is to be replaced with a list of nulls of equal length (9).
 		perl -p0777i -e 's@((?:Rotational|WakeKey\x0a)\x00{1,20})APPLE SSD(\x00{1,20}[QMT])@$1\x00\x00\x00\x00\x00\x00\x00\x00\x00$2@' ${IOAHCIBlockStorage}
 
-		if [[ "`md5 -q ${IOAHCIBlockStorage}`" == "`md5 -q ${backupFile}`" ]]; then
+		if [[ $(md5 -q ${IOAHCIBlockStorage}) == $(md5 -q ${backupFile}) ]]; then
 		    echo "Le patch de '${IOAHCIBlockStorage}' a echoué. Votre Kext IOAHCIBlockStorage n'est pas modifié."
 		    logger \"-- [${scriptName}] : Le patch de '${IOAHCIBlockStorage}' a echoué. Votre Kext IOAHCIBlockStorage est inchangé.\"
+		    deleteTmpFiles
 		    exit 1
 		else
 		    touch /System/Library/Extensions/
@@ -181,7 +184,7 @@ if [[ ${SystemOSMajor} -eq 10 && ( ${SystemOSMinor} -lt 10 ) ]] || [[ ${SystemOS
 		    # Force a reboot of the system's kernel extension cache
 			echo "Nous rebootons."
 			logger \"-- [${scriptName}] : trimEnabler reboote la machine pour terminer.\"
-			echo "${SystemOS}" > ${varDirTrimEnabler}
+			echo "${SystemOS}" > ${historyKextPatches}
 		    deleteTmpFiles
 		    shutdown -r now
 		fi
