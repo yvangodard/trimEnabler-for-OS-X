@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables initialisation
-version="trimEnabler v0.3 - 2016, Yvan Godard [godardyvan@gmail.com]"
+version="trimEnabler v0.4 - 2016, Yvan Godard [godardyvan@gmail.com]"
 SystemOS=$(sw_vers -productVersion | awk -F "." '{print $0}')
 SystemOSMajor=$(sw_vers -productVersion | awk -F "." '{print $1}')
 SystemOSMinor=$(sw_vers -productVersion | awk -F "." '{print $2}')
@@ -61,10 +61,23 @@ fi
 # Suppression des anciens fichiers temporaires
 deleteTmpFiles
 
-# Rechercehde tous les SSD
-for disk in $(diskutil list | grep "/dev/") ; do 
-	[[ $(diskutil info "$disk" | grep "Solid State" | awk -F " " '{print $3}' | grep "Yes") -eq "Yes" ]] && let hasOneOrMoreSSD=${hasOneOrMoreSSD}+1
+# Changement du séparateur par défaut
+OLDIFS=$IFS
+IFS=$'\n'
+# On vérifie le statut SSD avec la commande system_profiler car avec diskutil info, 
+# certains SSD patchés pour le support de TRIM ne sont plus reconnus comme SSD
+for disque in $(system_profiler -detailLevel mini SPSerialATADataType | grep "Medium Type"); do
+	echo "${disque}" | grep "Solid State" > /dev/null 2>&1
+	[ $? -eq 0 ] && let hasOneOrMoreSSD=${hasOneOrMoreSSD}+1
 done
+IFS=$OLDIFS
+
+# Rechercehde tous les SSD / ancienne méthode utilisant la fonction diskutil
+# plus utilisée, car sur certains disques dont le kext a été patché pour activer trim
+# l'information "Solid State" ne remonte pas
+# for disk in $(diskutil list | grep "/dev/") ; do 
+#	[[ $(diskutil info "$disk" | grep "Solid State" | awk -F " " '{print $3}' | grep "Yes") -eq "Yes" ]] && let hasOneOrMoreSSD=${hasOneOrMoreSSD}+1
+# done
 
 # On arrête le processus s'il n'y a pas de SSD
 # [[ ${hasOneOrMoreSSD} -eq 0 ]] >> il n'y a pas de SSD
