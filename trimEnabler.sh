@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables initialisation
-version="trimEnabler v0.4 - 2016, Yvan Godard [godardyvan@gmail.com]"
+version="trimEnabler v0.5 - 2016, Yvan Godard [godardyvan@gmail.com]"
 SystemOS=$(sw_vers -productVersion | awk -F "." '{print $0}')
 SystemOSMajor=$(sw_vers -productVersion | awk -F "." '{print $1}')
 SystemOSMinor=$(sw_vers -productVersion | awk -F "." '{print $2}')
@@ -20,6 +20,7 @@ backupIncipit=$(basename ${IOAHCIBlockStorage})
 backupExtension="original-$(date +%d.%m.%y@%Hh%M)"
 backupFile=${varBackupDirTrimEnabler%/}/${backupIncipit}.${backupExtension}
 historyKextPatches=${varDirTrimEnabler%/}/historyKextPatches.txt
+githubRemoteScript="https://raw.githubusercontent.com/yvangodard/trimEnabler-for-OS-X/master/trimEnabler.sh"
 
 function deleteTmpFiles () {
 	ls /tmp/${scriptNameWithoutExt}* > /dev/null 2>&1
@@ -37,6 +38,34 @@ echo "****************************** `date` ******************************"
 echo "${scriptName} démarré..."
 echo "sur Mac OSX version ${SystemOS}"
 echo ""
+
+# Check URL
+function checkUrl() {
+  command -p curl -Lsf "$1" >/dev/null
+  echo "$?"
+}
+
+# Changement du séparateur par défaut et mise à jour auto
+OLDIFS=$IFS
+IFS=$'\n'
+# Auto-update script
+if [[ $(checkUrl ${githubRemoteScript}) -eq 0 ]] && [[ $(md5 -q "$0") != $(curl -Lsf ${githubRemoteScript} | md5 -q) ]]; then
+	[[ -e "$0".old ]] && rm "$0".old
+	mv "$0" "$0".old
+	curl -Lsf ${githubRemoteScript} >> "$0"
+	echo "Une mise à jour de ${0} est disponible. Nous la téléchargeons depuis GitHub."
+	if [ $? -eq 0 ]; then
+		echo "Mise à jour réussie, nous relançons le script."
+		chmod +x "$0"
+		exec ${0} "$@"
+		exit $0
+	else
+		echo "Un problème a été rencontré pour mettre à jour ${0}."
+		echo "Nous poursuivons avec l'ancienne version du script."
+	fi
+	echo ""
+fi
+IFS=$OLDIFS
 
 if [[ ! -d ${varDirTrimEnabler} ]]; then
 	mkdir -p ${varDirTrimEnabler}
@@ -114,6 +143,8 @@ fi
 
 ## Si le système est OS ≥ 10.10.4
 if [[ ${SystemOSMinor} -ge 11 ]] || [[ ${SystemOSMajor} -eq 10 && ${SystemOSMinor} -ge 10 && ${SystemOSPoint} -ge 4 ]] ; then
+	# Disable the sudden motion sensor as it’s not useful for SSDs
+	pmset -a sms 0
 	tmpInputEnableTrim=$(mktemp /tmp/${scriptNameWithoutExt}_tmpInputEnableTrim.XXXXX)
 	echo "y" > ${tmpInputEnableTrim}
 	echo "y" >> ${tmpInputEnableTrim}
@@ -198,6 +229,8 @@ if [[ ${SystemOSMajor} -eq 10 && ${SystemOSMinor} -lt 10 ]] || [[ ${SystemOSMajo
 			echo "Nous rebootons."
 			logger \"-- [${scriptName}] : trimEnabler reboote la machine pour terminer.\"
 			echo "${SystemOS}" > ${historyKextPatches}
+			# Disable the sudden motion sensor as it’s not useful for SSDs
+			pmset -a sms 0
 		    deleteTmpFiles
 		    shutdown -r now
 		fi
