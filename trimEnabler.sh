@@ -53,7 +53,8 @@ if [[ $(checkUrl ${githubRemoteScript}) -eq 0 ]] && [[ $(md5 -q "$0") != $(curl 
 	[[ -e "$0".old ]] && rm "$0".old
 	mv "$0" "$0".old
 	curl -Lsf ${githubRemoteScript} >> "$0"
-	echo "Une mise à jour de ${0} est disponible. Nous la téléchargeons depuis GitHub."
+	echo "Une mise à jour de ${0} est disponible."
+	echo "Nous la téléchargeons depuis GitHub."
 	if [ $? -eq 0 ]; then
 		echo "Mise à jour réussie, nous relançons le script."
 		chmod +x "$0"
